@@ -4,7 +4,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './App.css';
 
 // Ingredient component that can be dragged
-const Ingredient = ({ item, type, onDrop }) => {
+const Ingredient = ({ item, type }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: type,
     item: { ...item, ingredientType: type },
@@ -17,10 +17,11 @@ const Ingredient = ({ item, type, onDrop }) => {
     <div
       ref={drag}
       className={`ingredient-item ${isDragging ? 'dragging' : ''}`}
-      title={`${item.name} ($${item.price.toFixed(2)})`}
+      title={`${item.name}`}
     >
       <span className="ingredient-emoji">{item.image}</span>
       <span className="ingredient-name">{item.name}</span>
+      <span className="ingredient-price">${item.price.toFixed(2)}</span>
     </div>
   );
 };
@@ -44,7 +45,7 @@ const SandwichDropZone = ({ sandwichLayers, onDrop }) => {
         sandwichLayers
       ) : (
         <div className="empty-sandwich">
-          Drag ingredients here to build your sandwich!
+          Drag ingredients here to craft your perfect sandwich
         </div>
       )}
     </div>
@@ -58,28 +59,35 @@ const SandwichBuilder = () => {
       { id: 1, name: 'White Bread', image: '🍞', price: 1, layer: 'bread' },
       { id: 2, name: 'Whole Wheat', image: '🥖', price: 1.5, layer: 'bread' },
       { id: 3, name: 'Sourdough', image: '🥪', price: 2, layer: 'bread' },
+      { id: 4, name: 'Brioche Bun', image: '🍔', price: 2.5, layer: 'bread' },
     ],
     protein: [
       { id: 1, name: 'Turkey', image: '🦃', price: 2, layer: 'protein' },
       { id: 2, name: 'Ham', image: '🐷', price: 2.5, layer: 'protein' },
       { id: 3, name: 'Tofu', image: '🧈', price: 1.5, layer: 'protein' },
       { id: 4, name: 'Chicken', image: '🐔', price: 2.25, layer: 'protein' },
+      { id: 5, name: 'Roast Beef', image: '🥩', price: 3, layer: 'protein' },
     ],
     cheese: [
       { id: 1, name: 'Cheddar', image: '🧀', price: 1, layer: 'cheese' },
       { id: 2, name: 'Swiss', image: '🧀', price: 1.25, layer: 'cheese' },
       { id: 3, name: 'Provolone', image: '🧀', price: 1.5, layer: 'cheese' },
+      { id: 4, name: 'Pepper Jack', image: '🧀', price: 1.75, layer: 'cheese' },
     ],
     veggies: [
       { id: 1, name: 'Lettuce', image: '🥬', price: 0.5, layer: 'veggie' },
       { id: 2, name: 'Tomato', image: '🍅', price: 0.75, layer: 'veggie' },
       { id: 3, name: 'Onion', image: '🧅', price: 0.5, layer: 'veggie' },
       { id: 4, name: 'Avocado', image: '🥑', price: 1.5, layer: 'veggie' },
+      { id: 5, name: 'Bell Pepper', image: '🫑', price: 0.75, layer: 'veggie' },
+      { id: 6, name: 'Cucumber', image: '🥒', price: 0.5, layer: 'veggie' },
     ],
     condiments: [
-      { id: 1, name: 'Mayo', image: '🥄', price: 0.25, layer: 'condiment' },
-      { id: 2, name: 'Mustard', image: '🥄', price: 0.25, layer: 'condiment' },
-      { id: 3, name: 'Ketchup', image: '🥄', price: 0.25, layer: 'condiment' },
+      { id: 1, name: 'Mayo', image: '💧', price: 0.25, layer: 'condiment' },
+      { id: 2, name: 'Mustard', image: '💛', price: 0.25, layer: 'condiment' },
+      { id: 3, name: 'Ketchup', image: '❤️', price: 0.25, layer: 'condiment' },
+      { id: 4, name: 'Hot Sauce', image: '🌶️', price: 0.5, layer: 'condiment' },
+      { id: 5, name: 'Pesto', image: '🌿', price: 0.75, layer: 'condiment' },
     ],
   };
 
@@ -148,22 +156,15 @@ const SandwichBuilder = () => {
     );
   };
 
-  // Build the sandwich and calculate score
-  const buildSandwich = () => {
-    if (sandwichLayers.length === 0) {
-      alert('Please add some ingredients to build your sandwich!');
-      return;
-    }
+  // Calculate the total price of current sandwich
+  const calculateSandwichPrice = () => {
+    let total = 0;
     
-    setTotalMade(prev => prev + 1);
-    
-    // Calculate score
-    let sandwichScore = 0;
+    // Calculate bread
     const bread = sandwichLayers.find(layer => layer.props['data-layer'] === 'bread');
     if (bread) {
-      // Find the original bread item to get price
       const breadItem = ingredients.bread.find(b => b.image === bread.props.children);
-      sandwichScore += breadItem.price * 2; // Both slices
+      if (breadItem) total += breadItem.price * 2; // Both slices
     }
     
     // Calculate other ingredients
@@ -177,12 +178,35 @@ const SandwichBuilder = () => {
           'condiments';
         
         const item = ingredients[category].find(i => i.image === layer.props.children);
-        if (item) sandwichScore += item.price;
+        if (item) total += item.price;
       }
     });
     
-    setScore(prev => prev + sandwichScore);
-    alert(`Sandwich built! Added ${sandwichScore.toFixed(2)} points to your score.`);
+    return total.toFixed(2);
+  };
+
+  // Build the sandwich and calculate score
+  const buildSandwich = () => {
+    if (sandwichLayers.length === 0) {
+      alert('Please add some ingredients to build your sandwich!');
+      return;
+    }
+    
+    const sandwichPrice = parseFloat(calculateSandwichPrice());
+    setTotalMade(prev => prev + 1);
+    setScore(prev => prev + sandwichPrice);
+    
+    // Create more encouraging and appealing message
+    const messages = [
+      `Your delicious sandwich worth $${sandwichPrice} is ready!`,
+      `Sandwich created! Added $${sandwichPrice} to your score.`,
+      `Yum! Your $${sandwichPrice} culinary masterpiece is complete!`,
+      `Sandwich built! That's $${sandwichPrice} of pure deliciousness.`
+    ];
+    
+    // Select a random message
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    alert(randomMessage);
   };
 
   // Reset the current sandwich
@@ -194,10 +218,9 @@ const SandwichBuilder = () => {
   const renderIngredientPanel = () => {
     return (
       <div className="ingredient-panel">
-        <h2>Ingredients</h2>
-        
         <div className="ingredient-category">
-          <h3>Bread (Drag to add both slices)</h3>
+          <h3>Bread</h3>
+          <p className="bread-note">Drag to add both top and bottom slices</p>
           <div className="ingredient-grid">
             {ingredients.bread.map(item => (
               <Ingredient 
@@ -267,33 +290,60 @@ const SandwichBuilder = () => {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="sandwich-builder">
-        <h1>🥪 Drag & Drop Sandwich Builder 🍽️</h1>
+        <div className="app-header">
+          <h1>🥪 Sandwich Studio 🍽️</h1>
+          <p className="app-tagline">Craft your perfect sandwich with our drag & drop builder</p>
+        </div>
         
         <div className="game-stats">
-          <p>Total Sandwiches Made: <strong>{totalMade}</strong></p>
-          <p>Total Score: <strong>${score.toFixed(2)}</strong></p>
+          <div className="stat-item">
+            <span className="stat-label">Sandwiches Created</span>
+            <span className="stat-value">{totalMade}</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-label">Total Value</span>
+            <span className="stat-value">${score.toFixed(2)}</span>
+          </div>
+          {sandwichLayers.length > 0 && (
+            <div className="stat-item">
+              <span className="stat-label">Current Price</span>
+              <span className="stat-value">${calculateSandwichPrice()}</span>
+            </div>
+          )}
         </div>
         
-        <div className="sandwich-container">
-          <div className="sandwich-preview">
-            <h2>Your Sandwich</h2>
-            <SandwichDropZone 
-              sandwichLayers={sandwichLayers} 
-              onDrop={handleDrop} 
-            />
+        {/* Main layout container with flex */}
+        <div className="main-container">
+          {/* Left side - Sandwich building area */}
+          <div className="sandwich-section">
+            <h2 className="section-title">Your Creation</h2>
+            <div className="sandwich-container">
+              <div className="sandwich-preview">
+                <SandwichDropZone 
+                  sandwichLayers={sandwichLayers} 
+                  onDrop={handleDrop} 
+                />
+              </div>
+              
+              <div className="sandwich-controls">
+                <button onClick={buildSandwich} className="build-btn">
+                  Finish Sandwich
+                </button>
+                <button onClick={resetSandwich} className="reset-btn">
+                  Start Over
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div className="sandwich-controls">
-            <button onClick={buildSandwich} className="build-btn">
-              Build Sandwich!
-            </button>
-            <button onClick={resetSandwich} className="reset-btn">
-              Reset Current
-            </button>
+          {/* Right side - Ingredients panel with fixed height and scrolling */}
+          <div className="ingredients-section">
+            <h2 className="section-title">Ingredients</h2>
+            <div className="ingredients-container">
+              {renderIngredientPanel()}
+            </div>
           </div>
         </div>
-        
-        {renderIngredientPanel()}
       </div>
     </DndProvider>
   );
