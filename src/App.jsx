@@ -4,24 +4,26 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import './App.css';
 
 // Ingredient component that can be dragged
-const Ingredient = ({ item, type }) => {
+const Ingredient = ({ item, type, disabled }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: type,
     item: { ...item, ingredientType: type },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
+    canDrag: !disabled, // Disable dragging if the ingredient is disabled
   }));
 
   return (
     <div
       ref={drag}
-      className={`ingredient-item ${isDragging ? 'dragging' : ''}`}
-      title={`${item.name}`}
+      className={`ingredient-item ${isDragging ? 'dragging' : ''} ${disabled ? 'disabled' : ''}`}
+      title={`${item.name}${disabled ? ' - Please add bread first' : ''}`}
     >
       <span className="ingredient-emoji">{item.image}</span>
       <span className="ingredient-name">{item.name}</span>
       <span className="ingredient-price">${item.price.toFixed(2)}</span>
+      {disabled && <div className="disabled-overlay"></div>}
     </div>
   );
 };
@@ -45,7 +47,7 @@ const SandwichDropZone = ({ sandwichLayers, onDrop }) => {
         sandwichLayers
       ) : (
         <div className="empty-sandwich">
-          Drag ingredients here to craft your perfect sandwich
+          Start by adding bread to build your sandwich
         </div>
       )}
     </div>
@@ -96,14 +98,17 @@ const SandwichBuilder = () => {
   const [score, setScore] = useState(0);
   const [totalMade, setTotalMade] = useState(0);
 
+  // Check if sandwich has bread
+  const hasBread = sandwichLayers.some(layer => layer.props['data-layer'] === 'bread');
+
   // Handle dropping an ingredient onto the sandwich
   const handleDrop = (item) => {
     // If bread is being added, we need special handling
     if (item.layer === 'bread') {
       // Check if we already have bread
-      const hasBread = sandwichLayers.some(layer => layer.props['data-layer'] === 'bread');
+      const breadExists = sandwichLayers.some(layer => layer.props['data-layer'] === 'bread');
       
-      if (!hasBread) {
+      if (!breadExists) {
         // Add both top and bottom bread
         setSandwichLayers([
           createLayer({ ...item, position: 'bottom' }),
@@ -124,14 +129,20 @@ const SandwichBuilder = () => {
       }
     }
     
-    // For other ingredients, add them between the bread slices
+    // For other ingredients, check if bread exists first
+    if (!hasBread) {
+      alert('Please add bread first before adding other ingredients!');
+      return;
+    }
+    
+    // Add ingredients between the bread slices
     setSandwichLayers(prev => {
       const topBreadIndex = prev.findIndex(layer => 
         layer.props['data-layer'] === 'bread' && layer.props['data-position'] === 'top'
       );
       
       if (topBreadIndex === -1) {
-        // No bread yet, just add to the end
+        // No top bread (shouldn't happen), just add to the end
         return [...prev, createLayer(item)];
       }
       
@@ -192,6 +203,11 @@ const SandwichBuilder = () => {
       return;
     }
     
+    if (!hasBread) {
+      alert('A sandwich needs bread! Please add bread first.');
+      return;
+    }
+    
     const sandwichPrice = parseFloat(calculateSandwichPrice());
     setTotalMade(prev => prev + 1);
     setScore(prev => prev + sandwichPrice);
@@ -227,6 +243,7 @@ const SandwichBuilder = () => {
                 key={`bread-${item.id}`} 
                 item={item} 
                 type="bread" 
+                disabled={false} // Bread is always enabled
               />
             ))}
           </div>
@@ -240,6 +257,7 @@ const SandwichBuilder = () => {
                 key={`protein-${item.id}`} 
                 item={item} 
                 type="protein" 
+                disabled={!hasBread} // Disabled if no bread
               />
             ))}
           </div>
@@ -253,6 +271,7 @@ const SandwichBuilder = () => {
                 key={`cheese-${item.id}`} 
                 item={item} 
                 type="cheese" 
+                disabled={!hasBread} // Disabled if no bread
               />
             ))}
           </div>
@@ -266,6 +285,7 @@ const SandwichBuilder = () => {
                 key={`veggie-${item.id}`} 
                 item={item} 
                 type="veggie" 
+                disabled={!hasBread} // Disabled if no bread
               />
             ))}
           </div>
@@ -279,6 +299,7 @@ const SandwichBuilder = () => {
                 key={`condiment-${item.id}`} 
                 item={item} 
                 type="condiment" 
+                disabled={!hasBread} // Disabled if no bread
               />
             ))}
           </div>
@@ -339,6 +360,11 @@ const SandwichBuilder = () => {
           {/* Right side - Ingredients panel with fixed height and scrolling */}
           <div className="ingredients-section">
             <h2 className="section-title">Ingredients</h2>
+            {!hasBread && (
+              <div className="bread-required-message">
+                Please add bread first to enable other ingredients
+              </div>
+            )}
             <div className="ingredients-container">
               {renderIngredientPanel()}
             </div>
