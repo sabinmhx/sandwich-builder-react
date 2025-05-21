@@ -3,32 +3,30 @@ import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './App.css';
 
-// Ingredient component that can be dragged
-const Ingredient = ({ item, type, disabled }) => {
+const Ingredient = ({ item, type, disabled, locked }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
-    type: type,
-    item: { ...item, ingredientType: type },
+    type,
+    item,
+    canDrag: !disabled && !locked,
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
-    canDrag: !disabled, // Disable dragging if the ingredient is disabled
-  }));
+  }), [item, disabled, locked]);
 
   return (
     <div
       ref={drag}
-      className={`ingredient-item ${isDragging ? 'dragging' : ''} ${disabled ? 'disabled' : ''}`}
-      title={`${item.name}${disabled ? ' - Please add bread first' : ''}`}
+      className={`ingredient-item ${isDragging ? 'dragging' : ''} ${disabled || locked ? 'disabled' : ''}`}
+      title={`${item.name}${disabled ? ' - Please add bread first' : ''}${locked ? ' - Premium ingredient' : ''}`}
     >
       <span className="ingredient-emoji">{item.image}</span>
       <span className="ingredient-name">{item.name}</span>
       <span className="ingredient-price">${item.price.toFixed(2)}</span>
-      {disabled && <div className="disabled-overlay"></div>}
+      {(disabled || locked) && <div className="disabled-overlay"></div>}
     </div>
   );
 };
 
-// Sandwich drop zone component
 const SandwichDropZone = ({ sandwichLayers, onDrop }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ['bread', 'protein', 'cheese', 'veggie', 'condiment'],
@@ -39,36 +37,49 @@ const SandwichDropZone = ({ sandwichLayers, onDrop }) => {
   }));
 
   return (
-    <div 
-      ref={drop} 
-      className={`sandwich-display ${isOver ? 'drop-active' : ''}`}
-    >
-      {sandwichLayers.length > 0 ? (
-        sandwichLayers
-      ) : (
-        <div className="empty-sandwich">
-          Start by adding bread to build your sandwich
-        </div>
-      )}
+    <div ref={drop} className={`sandwich-display ${isOver ? 'drop-active' : ''}`}>
+      {sandwichLayers.length > 0
+        ? sandwichLayers
+        : <div className="empty-sandwich">Start by adding bread to build your sandwich</div>}
     </div>
   );
 };
 
+// --- Utility Functions ---
+const hasBread = (layers) => layers.some(layer => layer.props['data-layer'] === 'bread');
+
+const createLayer = (item) => (
+  <div
+    key={`${item.layer}-${Date.now()}-${Math.random()}`}
+    className={`ingredient-layer ${item.layer} ${item.position || ''}`}
+    data-layer={item.layer}
+    data-position={item.position}
+  >
+    {item.image}
+  </div>
+);
+
 const SandwichBuilder = () => {
-  // Available ingredients with their properties
+  const [sandwichLayers, setSandwichLayers] = useState([]);
+  const [score, setScore] = useState(0);
+  const [totalMade, setTotalMade] = useState(0);
+  const [premiumUnlocked, setPremiumUnlocked] = useState(false);
+  const [challengeSubmissions, setChallengeSubmissions] = useState([]);
+  const [voteCounts, setVoteCounts] = useState({});
+
   const ingredients = {
     bread: [
       { id: 1, name: 'White Bread', image: '🍞', price: 1, layer: 'bread' },
       { id: 2, name: 'Whole Wheat', image: '🥖', price: 1.5, layer: 'bread' },
       { id: 3, name: 'Sourdough', image: '🥪', price: 2, layer: 'bread' },
-      { id: 4, name: 'Brioche Bun', image: '🍔', price: 2.5, layer: 'bread' },
+      { id: 4, name: 'Brioche Bun', image: '🍔', price: 2.5, layer: 'bread', isPremium: true },
     ],
     protein: [
       { id: 1, name: 'Turkey', image: '🦃', price: 2, layer: 'protein' },
       { id: 2, name: 'Ham', image: '🐷', price: 2.5, layer: 'protein' },
       { id: 3, name: 'Tofu', image: '🧈', price: 1.5, layer: 'protein' },
       { id: 4, name: 'Chicken', image: '🐔', price: 2.25, layer: 'protein' },
-      { id: 5, name: 'Roast Beef', image: '🥩', price: 3, layer: 'protein' },
+      { id: 5, name: 'Roast Beef', image: '🥩', price: 3, layer: 'protein', isPremium: true },
     ],
     cheese: [
       { id: 1, name: 'Cheddar', image: '🧀', price: 1, layer: 'cheese' },
@@ -80,7 +91,7 @@ const SandwichBuilder = () => {
       { id: 1, name: 'Lettuce', image: '🥬', price: 0.5, layer: 'veggie' },
       { id: 2, name: 'Tomato', image: '🍅', price: 0.75, layer: 'veggie' },
       { id: 3, name: 'Onion', image: '🧅', price: 0.5, layer: 'veggie' },
-      { id: 4, name: 'Avocado', image: '🥑', price: 1.5, layer: 'veggie' },
+      { id: 4, name: 'Avocado', image: '🥑', price: 1.5, layer: 'veggie', isPremium: true },
       { id: 5, name: 'Bell Pepper', image: '🫑', price: 0.75, layer: 'veggie' },
       { id: 6, name: 'Cucumber', image: '🥒', price: 0.5, layer: 'veggie' },
     ],
@@ -88,224 +99,92 @@ const SandwichBuilder = () => {
       { id: 1, name: 'Mayo', image: '💧', price: 0.25, layer: 'condiment' },
       { id: 2, name: 'Mustard', image: '💛', price: 0.25, layer: 'condiment' },
       { id: 3, name: 'Ketchup', image: '❤️', price: 0.25, layer: 'condiment' },
-      { id: 4, name: 'Hot Sauce', image: '🌶️', price: 0.5, layer: 'condiment' },
-      { id: 5, name: 'Pesto', image: '🌿', price: 0.75, layer: 'condiment' },
+      { id: 4, name: 'Hot Sauce', image: '🌶️', price: 0.5, layer: 'condiment', isPremium: true },
+      { id: 5, name: 'Pesto', image: '🌿', price: 0.75, layer: 'condiment', isPremium: true },
     ],
   };
 
-  // State for sandwich layers
-  const [sandwichLayers, setSandwichLayers] = useState([]);
-  const [score, setScore] = useState(0);
-  const [totalMade, setTotalMade] = useState(0);
+  const onDrop = (item) => {
+    setSandwichLayers(prev => {
+      const hasBreadAlready = hasBread(prev);
 
-  // Check if sandwich has bread
-  const hasBread = sandwichLayers.some(layer => layer.props['data-layer'] === 'bread');
-
-  // Handle dropping an ingredient onto the sandwich
-  const handleDrop = (item) => {
-    // If bread is being added, we need special handling
-    if (item.layer === 'bread') {
-      // Check if we already have bread
-      const breadExists = sandwichLayers.some(layer => layer.props['data-layer'] === 'bread');
-      
-      if (!breadExists) {
-        // Add both top and bottom bread
-        setSandwichLayers([
+      // Handle bread drop
+      if (item.layer === 'bread') {
+        const breadLayers = [
           createLayer({ ...item, position: 'bottom' }),
-          createLayer({ ...item, position: 'top' })
-        ]);
-        return;
-      } else {
-        // Replace existing bread
-        setSandwichLayers(prev => {
-          const newLayers = prev.filter(layer => layer.props['data-layer'] !== 'bread');
+          createLayer({ ...item, position: 'top' }),
+        ];
+
+        if (!hasBreadAlready) {
+          return breadLayers;
+        } else {
+          const withoutBread = prev.filter(layer => layer.props['data-layer'] !== 'bread');
           return [
             createLayer({ ...item, position: 'bottom' }),
-            ...newLayers,
-            createLayer({ ...item, position: 'top' })
+            ...withoutBread,
+            createLayer({ ...item, position: 'top' }),
           ];
-        });
-        return;
+        }
       }
-    }
-    
-    // For other ingredients, check if bread exists first
-    if (!hasBread) {
-      alert('Please add bread first before adding other ingredients!');
-      return;
-    }
-    
-    // Add ingredients between the bread slices
-    setSandwichLayers(prev => {
-      const topBreadIndex = prev.findIndex(layer => 
-        layer.props['data-layer'] === 'bread' && layer.props['data-position'] === 'top'
-      );
-      
-      if (topBreadIndex === -1) {
-        // No top bread (shouldn't happen), just add to the end
-        return [...prev, createLayer(item)];
+
+      if (item.isPremium && !premiumUnlocked) {
+        alert('This is a premium ingredient. Unlock premium to use it!');
+        return prev;
       }
-      
-      // Insert before the top bread
+
+      if (!hasBreadAlready) {
+        alert('Please add bread first!');
+        return prev;
+      }
+
+      const topBreadIndex = prev.findIndex(layer =>
+        layer.props['data-layer'] === 'bread' && layer.props['data-position'] === 'top');
+      const newLayer = createLayer(item);
+      if (topBreadIndex === -1) return [...prev, newLayer];
       const newLayers = [...prev];
-      newLayers.splice(topBreadIndex, 0, createLayer(item));
+      newLayers.splice(topBreadIndex, 0, newLayer);
       return newLayers;
     });
   };
 
-  // Create a visual layer for the sandwich
-  const createLayer = (item) => {
-    return (
-      <div
-        key={`${item.layer}-${Date.now()}-${Math.random()}`}
-        className={`ingredient-layer ${item.layer} ${item.position || ''}`}
-        data-layer={item.layer}
-        data-position={item.position}
-      >
-        {item.image}
-      </div>
-    );
-  };
-
-  // Calculate the total price of current sandwich
   const calculateSandwichPrice = () => {
+    const allItems = Object.values(ingredients).flat();
     let total = 0;
-    
-    // Calculate bread
-    const bread = sandwichLayers.find(layer => layer.props['data-layer'] === 'bread');
-    if (bread) {
-      const breadItem = ingredients.bread.find(b => b.image === bread.props.children);
-      if (breadItem) total += breadItem.price * 2; // Both slices
-    }
-    
-    // Calculate other ingredients
     sandwichLayers.forEach(layer => {
-      const layerType = layer.props['data-layer'];
-      if (layerType !== 'bread') {
-        const category = 
-          layerType === 'protein' ? 'protein' :
-          layerType === 'cheese' ? 'cheese' :
-          layerType === 'veggie' ? 'veggies' :
-          'condiments';
-        
-        const item = ingredients[category].find(i => i.image === layer.props.children);
-        if (item) total += item.price;
-      }
+      const found = allItems.find(i => i.image === layer.props.children);
+      if (found) total += (found.layer === 'bread' ? found.price * 0.5 : found.price);
     });
-    
     return total.toFixed(2);
   };
 
-  // Build the sandwich and calculate score
   const buildSandwich = () => {
-    if (sandwichLayers.length === 0) {
-      alert('Please add some ingredients to build your sandwich!');
-      return;
-    }
-    
-    if (!hasBread) {
-      alert('A sandwich needs bread! Please add bread first.');
-      return;
-    }
-    
-    const sandwichPrice = parseFloat(calculateSandwichPrice());
-    setTotalMade(prev => prev + 1);
-    setScore(prev => prev + sandwichPrice);
-    
-    // Create more encouraging and appealing message
-    const messages = [
-      `Your delicious sandwich worth $${sandwichPrice} is ready!`,
-      `Sandwich created! Added $${sandwichPrice} to your score.`,
-      `Yum! Your $${sandwichPrice} culinary masterpiece is complete!`,
-      `Sandwich built! That's $${sandwichPrice} of pure deliciousness.`
-    ];
-    
-    // Select a random message
-    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-    alert(randomMessage);
+    if (!hasBread(sandwichLayers)) return alert('Add bread first!');
+    const price = parseFloat(calculateSandwichPrice());
+    setScore(score + price);
+    setTotalMade(totalMade + 1);
   };
 
-  // Reset the current sandwich
-  const resetSandwich = () => {
-    setSandwichLayers([]);
+  const saveSandwich = () => {
+    const simpleLayers = sandwichLayers.map(layer => ({
+      image: layer.props.children,
+      layer: layer.props['data-layer'],
+      position: layer.props['data-position'] || '',
+    }));
+    localStorage.setItem('savedSandwich', JSON.stringify(simpleLayers));
   };
 
-  // Render the ingredient panel
-  const renderIngredientPanel = () => {
-    return (
-      <div className="ingredient-panel">
-        <div className="ingredient-category">
-          <h3>Bread</h3>
-          <p className="bread-note">Drag to add both top and bottom slices</p>
-          <div className="ingredient-grid">
-            {ingredients.bread.map(item => (
-              <Ingredient 
-                key={`bread-${item.id}`} 
-                item={item} 
-                type="bread" 
-                disabled={false} // Bread is always enabled
-              />
-            ))}
-          </div>
-        </div>
-        
-        <div className="ingredient-category">
-          <h3>Protein</h3>
-          <div className="ingredient-grid">
-            {ingredients.protein.map(item => (
-              <Ingredient 
-                key={`protein-${item.id}`} 
-                item={item} 
-                type="protein" 
-                disabled={!hasBread} // Disabled if no bread
-              />
-            ))}
-          </div>
-        </div>
-        
-        <div className="ingredient-category">
-          <h3>Cheese</h3>
-          <div className="ingredient-grid">
-            {ingredients.cheese.map(item => (
-              <Ingredient 
-                key={`cheese-${item.id}`} 
-                item={item} 
-                type="cheese" 
-                disabled={!hasBread} // Disabled if no bread
-              />
-            ))}
-          </div>
-        </div>
-        
-        <div className="ingredient-category">
-          <h3>Veggies</h3>
-          <div className="ingredient-grid">
-            {ingredients.veggies.map(item => (
-              <Ingredient 
-                key={`veggie-${item.id}`} 
-                item={item} 
-                type="veggie" 
-                disabled={!hasBread} // Disabled if no bread
-              />
-            ))}
-          </div>
-        </div>
-        
-        <div className="ingredient-category">
-          <h3>Condiments</h3>
-          <div className="ingredient-grid">
-            {ingredients.condiments.map(item => (
-              <Ingredient 
-                key={`condiment-${item.id}`} 
-                item={item} 
-                type="condiment" 
-                disabled={!hasBread} // Disabled if no bread
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+  const submitToChallenge = () => {
+    const simpleLayers = sandwichLayers.map(layer => ({
+      image: layer.props.children,
+      layer: layer.props['data-layer'],
+      position: layer.props['data-position'] || '',
+    }));
+    const id = `submission-${Date.now()}`;
+    setChallengeSubmissions([{ id, layers: simpleLayers }, ...challengeSubmissions]);
+  };
+
+  const vote = (id) => {
+    setVoteCounts(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
   };
 
   return (
@@ -313,63 +192,71 @@ const SandwichBuilder = () => {
       <div className="sandwich-builder">
         <div className="app-header">
           <h1>🥪 Sandwich Studio 🍽️</h1>
-          <p className="app-tagline">Craft your perfect sandwich with our drag & drop builder</p>
+          <p className="app-tagline">Craft, save, and share your perfect sandwich!</p>
         </div>
-        
+
         <div className="game-stats">
-          <div className="stat-item">
-            <span className="stat-label">Sandwiches Created</span>
-            <span className="stat-value">{totalMade}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">Total Value</span>
-            <span className="stat-value">${score.toFixed(2)}</span>
-          </div>
-          {sandwichLayers.length > 0 && (
-            <div className="stat-item">
-              <span className="stat-label">Current Price</span>
-              <span className="stat-value">${calculateSandwichPrice()}</span>
-            </div>
-          )}
+          <div className="stat-item"><span className="stat-label">Sandwiches</span><span className="stat-value">{totalMade}</span></div>
+          <div className="stat-item"><span className="stat-label">Total Value</span><span className="stat-value">${score.toFixed(2)}</span></div>
+          <div className="stat-item"><span className="stat-label">Current Price</span><span className="stat-value">${calculateSandwichPrice()}</span></div>
         </div>
-        
-        {/* Main layout container with flex */}
+
         <div className="main-container">
-          {/* Left side - Sandwich building area */}
           <div className="sandwich-section">
-            <h2 className="section-title">Your Creation</h2>
-            <div className="sandwich-container">
-              <div className="sandwich-preview">
-                <SandwichDropZone 
-                  sandwichLayers={sandwichLayers} 
-                  onDrop={handleDrop} 
-                />
-              </div>
-              
-              <div className="sandwich-controls">
-                <button onClick={buildSandwich} className="build-btn">
-                  Finish Sandwich
-                </button>
-                <button onClick={resetSandwich} className="reset-btn">
-                  Start Over
-                </button>
-              </div>
+            <h2 className="section-title">Your Sandwich</h2>
+            <SandwichDropZone sandwichLayers={sandwichLayers} onDrop={onDrop} />
+            <div className="sandwich-controls">
+              <button className="build-btn" onClick={buildSandwich}>Finish</button>
+              <button className="reset-btn" onClick={() => setSandwichLayers([])}>Reset</button>
+              <button className="build-btn" onClick={saveSandwich}>Save</button>
+              <button className="build-btn" onClick={submitToChallenge}>Submit to Challenge</button>
+              <button className="build-btn" onClick={() => setPremiumUnlocked(true)}>Unlock Premium</button>
             </div>
           </div>
-          
-          {/* Right side - Ingredients panel with fixed height and scrolling */}
+
           <div className="ingredients-section">
             <h2 className="section-title">Ingredients</h2>
-            {!hasBread && (
-              <div className="bread-required-message">
-                Please add bread first to enable other ingredients
-              </div>
-            )}
             <div className="ingredients-container">
-              {renderIngredientPanel()}
+              <div className="ingredient-panel">
+                {Object.entries(ingredients).map(([category, items]) => (
+                  <div className="ingredient-category" key={category}>
+                    <h3>{category}</h3>
+                    <div className="ingredient-grid">
+                      {items.map(item => (
+                        <Ingredient
+                          key={item.id}
+                          item={item}
+                          type={category === 'veggies' ? 'veggie' : category}
+                          disabled={!hasBread(sandwichLayers) && category !== 'bread'}
+                          locked={item.isPremium && !premiumUnlocked}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
+
+        {challengeSubmissions.length > 0 && (
+          <div className="challenge-section">
+            <h2>🌟 Challenge Submissions</h2>
+            <div className="challenge-scroll-container">
+              {challengeSubmissions.map(sub => (
+                <div key={sub.id} className="challenge-card">
+                  <div className="sandwich-display challenge-sandwich">
+                    {sub.layers.map((layer, i) => (
+                      <div key={i} className={`ingredient-layer ${layer.layer} ${layer.position}`}>{layer.image}</div>
+                    ))}
+                  </div>
+                  <button onClick={() => vote(sub.id)}>Vote</button>
+                  <p>Votes: {voteCounts[sub.id] || 0}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </DndProvider>
   );
