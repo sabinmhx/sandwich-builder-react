@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import './App.css';
+import { useEffect } from 'react';
+
+
 
 const Ingredient = ({ item, type, disabled, locked }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -187,6 +190,39 @@ const SandwichBuilder = () => {
     setVoteCounts(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
   };
 
+    const shareSandwich = () => {
+    const simpleLayers = sandwichLayers.map(layer => ({
+      image: layer.props.children,
+      layer: layer.props['data-layer'],
+      position: layer.props['data-position'] || '',
+    }));
+
+    const encoded = btoa(JSON.stringify(simpleLayers));
+    const url = `${window.location.origin}${window.location.pathname}?s=${encoded}`;
+
+    navigator.clipboard.writeText(url).then(() => {
+      alert('Shareable link copied to clipboard!');
+    }).catch(err => {
+      alert('Failed to copy link. Please try again.');
+    });
+
+    useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const shared = params.get('s');
+  if (shared) {
+    try {
+      const decoded = JSON.parse(atob(shared));
+      const layers = decoded.map(item => createLayer(item));
+      setSandwichLayers(layers);
+    } catch (err) {
+      console.error('Invalid shared sandwich data.');
+    }
+  }
+}, []);
+
+  };
+
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="sandwich-builder">
@@ -208,12 +244,13 @@ const SandwichBuilder = () => {
             <div className="sandwich-controls">
               <button className="build-btn" onClick={buildSandwich}>Finish</button>
               <button className="reset-btn" onClick={() => setSandwichLayers([])}>Reset</button>
-              <button className="build-btn" onClick={saveSandwich}>Save</button>
+              {/* <button className="build-btn" onClick={saveSandwich}>Save</button> */}
+              <button className="build-btn" onClick={shareSandwich}>Share</button>
               <button className="build-btn" onClick={submitToChallenge}>Submit to Challenge</button>
               <button className="build-btn" onClick={() => setPremiumUnlocked(true)}>Unlock Premium</button>
             </div>
           </div>
-
+          <br/>
           <div className="ingredients-section">
             <h2 className="section-title">Ingredients</h2>
             <div className="ingredients-container">
